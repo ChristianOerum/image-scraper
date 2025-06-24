@@ -1,8 +1,12 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
+
+import tailwindcss from "@tailwindcss/vite";
+
 export default defineNuxtConfig({
   compatibilityDate: '2025-05-15',
-  devtools: { enabled: true },
-
+  devtools: { enabled: false },
+  css: ['~/assets/css/main.css'],
+  
   ssr: true,
   nitro: {
     preset: 'node',
@@ -14,6 +18,12 @@ export default defineNuxtConfig({
     '@nuxt/icon',
     '@nuxt/image',
     '@nuxt/ui',
-    '@nuxtjs/tailwindcss'
-  ]
+  ],
+
+  vite: {
+    plugins: [
+      tailwindcss(),
+    ],
+  },
+
 })
