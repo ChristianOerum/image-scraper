@@ -6,10 +6,17 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-05-15',
   devtools: { enabled: false },
   css: ['~/assets/css/main.css'],
-  
+    
   ssr: true,
   nitro: {
-    preset: 'node',
+    preset: 'firebase',
+    firebase: {
+      gen: 2,
+      httpsOptions: {
+        region: 'europe-west3',
+        maxInstances: 3,
+      },
+    },
   },
 
   modules: [
