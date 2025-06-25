@@ -62,6 +62,32 @@
           Selected: {{ selectedImages.length }} / {{ images.length }}
         </p>
 
+        <div v-if="fileTypes.length" class="flex flex-wrap gap-2 items-center mb-4">
+  <span class="text-sm mr-1">Filter:</span>
+
+  <button
+    v-for="type in fileTypes"
+    :key="type"
+    @click="toggleType(type)"
+    :class="[
+      'px-3 py-1 rounded-md border text-xs uppercase',
+      selectedTypes.has(type)
+        ? 'bg-text text-background border-text'
+        : 'bg-transparent text-text border-text/[0.4]'
+    ]"
+  >
+    {{ type }}
+  </button>
+
+  <button
+    v-if="selectedTypes.size"
+    @click="clearFilter"
+    class="ml-2 underline text-xs text-text/[0.7]"
+  >
+    Clear
+  </button>
+</div>
+
         <div class="grid grid-cols-3 md:grid-cols-5 gap-4">
           <div
             v-for="img in images"
@@ -75,17 +101,26 @@
                 <Icon name="heroicons:check-circle" class="text-primary text-[24px]" />
               </div>
             </Transition>
+
+            <span
+              class="absolute top-1 right-1 bg-background/70 backdrop-blur
+                    border border-secondary/[0.4] rounded px-[4px] py-[2px]
+                    text-[10px] uppercase text-text/[0.65]"
+            >
+              {{ getExt(img) }}
+            </span>
             
             <img
               :src="result[img] || img"
               class="w-28 h-28 object-contain rounded-md"
             />
-            <button v-if="!result[img]"
+            <button
+              v-if="!result[img]"
               class="mt-1 bg-accent/[0.2] text-accent px-2 py-1 text-xs rounded-md w-full"
-              @click="removeBg(img), $event.stopPropagation()"
-              :disabled="loadingMap[img] || !!result[img]"
+              @click="removeBg(img); $event.stopPropagation()"
+              :disabled="loadingMap[img] || !!result[img] || isSvg(img)"
             >
-              {{ result[img] ? '✔' : loadingMap[img] ? '…' : 'Remove BG' }}
+              {{ isSvg(img) ? 'SVG – Not supported' : result[img] ? '✔' : loadingMap[img] ? '…' : 'Remove BG' }}
             </button>
 
             <a
@@ -120,12 +155,47 @@ import JSZip from 'jszip'
 import { saveAs } from 'file-saver'
 import { vAutoAnimate } from '@formkit/auto-animate'
 
-const url = ref('')
-const images = ref([])
-const result = ref({})
+
+function toggleType(t) {
+  selectedTypes.value.has(t)
+    ? selectedTypes.value.delete(t)
+    : selectedTypes.value.add(t)
+}
+function clearFilter() {
+  selectedTypes.value.clear()
+}
+
+function getExt(src) {
+  try {
+    return new URL(src).pathname.split('.').pop().split(/[?#]/)[0].toLowerCase()
+  } catch {
+    return ''
+  }
+}
+
+function isSvg(src) {
+  return getExt(src) === 'svg'
+}
+
+/* ---------- STATE ---------- */
+const url            = ref('')
+const allImages      = ref([])              // raw list from backend
+const selectedTypes  = ref(new Set())       // active filters
 const selectedImages = ref([])
-const loading = ref(false)
-const loadingMap = reactive({})
+const result         = ref({})
+const loading        = ref(false)
+const loadingMap     = reactive({})
+
+/* computed: unique types + filtered list */
+const fileTypes = computed(() => [...new Set(allImages.value.map(getExt))])
+const images    = computed(() =>
+  selectedTypes.value.size
+    ? allImages.value.filter(i => selectedTypes.value.has(getExt(i)))
+    : allImages.value
+)
+
+
+
 
 function toggleImage(img) {
   if (selectedImages.value.includes(img)) {
@@ -141,10 +211,10 @@ async function scrape() {
   loading.value = true
   result.value = {}
   selectedImages.value = []
-  images.value = []
+  allImages.value = []               // reset
   try {
     const res = await $fetch('/api/scrape', { method: 'POST', body: { url: url.value } })
-    images.value = res.slice(0, 20)
+    allImages.value = res.slice(0, 20)
   } catch (err) {
     alert('Failed to scrape site')
     console.error(err)
@@ -154,6 +224,11 @@ async function scrape() {
 }
 
 async function removeBg(imgUrl) {
+  if (isSvg(imgUrl)) {
+    alert('⚠️ Background removal is not supported for SVG images.')
+    return
+  }
+
   loadingMap[imgUrl] = true
   try {
     const blob = await $fetch('/api/remove', {
