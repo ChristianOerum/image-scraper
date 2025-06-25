@@ -1,8 +1,9 @@
 <template>
-  <div class="bg-background w-screen h-screen flex items-center justify-center font-railway">
+  <div class="bg-background w-screen h-screen flex items-center justify-center font-primary text-md">
     <a href="https://github.com/ChristianOerum" class="absolute bottom-4 text-primary/[0.2]">Developed by @ChristianOerum</a>
     <div class="p-6 max-w-6xl mx-auto">
-
+      
+    <Transition name="fade" tag="div" class="" mode="out-in">
       <div v-if="!images.length" class="flex flex-col items-center mb-20">
         <Icon name="fluent:image-sparkle-16-regular" class="text-primary/[0.2] text-[96px] mb-4" />
         <h1 class="text-3xl text-text font-bold mb-6 font-railway text-center">Image Scraper + Background Remover</h1>
@@ -25,69 +26,92 @@
 
       </div>
 
-      <TransitionGroup name="fade" tag="div" class="">
-      <div v-if="images.length" class="mt-6">
+      <div v-else-if="images.length" class="">
+
+        <div class="flex gap-2 items-center mb-4">
+
+          <button
+              @click="resetScraper"
+              class="bg-accent/[0.2] text-accent px-3 py-2 rounded"
+              >
+              Scrape a new site
+          </button>
+
+          <p v-if="scrapedSite"
+            class="text-sm text-text">
+            Current images scraped from
+            <a :href="url"
+              target="_blank"
+              rel="noopener"
+              class="underline font-semibold">
+              {{ scrapedSite }}
+            </a>
+          </p>
+
+        </div>
+
         <div class="flex gap-2 mb-4">
 
           <button
               @click="selectAll"
-              class="bg-text text-background px-3 py-2 rounded"
+              class="bg-text text-background px-3 py-2 rounded text-sm"
               >
               Select All
           </button>
           <button
               @click="deselectAll"
-              class="bg-text text-background px-3 py-2 rounded"
+              class="bg-text text-background px-3 py-2 rounded text-sm"
               >
               Deselect All
           </button>
 
           <button
             @click="downloadAll(false)"
-            class="bg-accent text-white px-4 py-2 rounded"
+            class="bg-accent text-white px-4 py-2 rounded text-sm"
             :disabled="selectedImages.length === 0"
           >
             Download selected (Originals)
           </button>
           <button
             @click="downloadAll(true)"
-            class="bg-accent text-white px-4 py-2 rounded"
+            class="bg-accent text-white px-4 py-2 rounded text-sm"
             :disabled="selectedImages.length === 0"
           >
             Download selected (Without BG)
           </button>
         </div>
 
-        <p class="text-sm text-text mb-2">
+        <p class="text-sm text-text mb-2 text-md">
           Selected: {{ selectedImages.length }} / {{ images.length }}
         </p>
 
-        <div v-if="fileTypes.length" class="flex flex-wrap gap-2 items-center mb-4">
-  <span class="text-sm mr-1">Filter:</span>
+        <div v-if="fileTypes.length" class="flex flex-wrap gap-2 items-center mb-4 text-md">
+        <span class="text-sm text-text mr-1 text-md">Filter by filetype</span>
 
-  <button
-    v-for="type in fileTypes"
-    :key="type"
-    @click="toggleType(type)"
-    :class="[
-      'px-3 py-1 rounded-md border text-xs uppercase',
-      selectedTypes.has(type)
-        ? 'bg-text text-background border-text'
-        : 'bg-transparent text-text border-text/[0.4]'
-    ]"
-  >
-    {{ type }}
-  </button>
+        <button
+          v-for="type in fileTypes"
+          :key="type"
+          @click="toggleType(type)"
+          :class="[
+            'px-3 py-1 rounded-md border text-xs uppercase',
+            selectedTypes.has(type)
+              ? 'bg-text text-background border-text'
+              : 'bg-transparent text-text border-text/[0.4]'
+          ]"
+        >
+          {{ type }}
+        </button>
 
-  <button
-    v-if="selectedTypes.size"
-    @click="clearFilter"
-    class="ml-2 underline text-xs text-text/[0.7]"
-  >
-    Clear
-  </button>
-</div>
+        <button
+          v-if="selectedTypes.size"
+          @click="clearFilter"
+          class="ml-2 underline text-xs text-accent/[0.7]"
+        >
+          Clear
+        </button>
+        </div>
 
+        <div class="scroll-window h-[65vh] overflow-y-auto pr-1">
         <div class="grid grid-cols-3 md:grid-cols-5 gap-4">
           <div
             v-for="img in images"
@@ -143,9 +167,9 @@
             </a>
           </div>
         </div>
-      </div>
-      </TransitionGroup>
-      
+        </div>
+      </div>  
+      </Transition>  
     </div>
   </div>
 </template>
@@ -153,8 +177,10 @@
 <script setup>
 import JSZip from 'jszip'
 import { saveAs } from 'file-saver'
-import { vAutoAnimate } from '@formkit/auto-animate'
 
+useHead({
+  title: 'Image Scraper + Background Remover'
+})
 
 function toggleType(t) {
   selectedTypes.value.has(t)
@@ -177,8 +203,9 @@ function isSvg(src) {
   return getExt(src) === 'svg'
 }
 
-/* ---------- STATE ---------- */
+
 const url            = ref('')
+const scrapedSite   = ref('')
 const allImages      = ref([])              // raw list from backend
 const selectedTypes  = ref(new Set())       // active filters
 const selectedImages = ref([])
@@ -195,7 +222,18 @@ const images    = computed(() =>
 )
 
 
+function resetScraper() {
+  url.value           = ''          // clear the input
+  scrapedSite.value   = ''          // forget last hostname (if you added this)
+  allImages.value     = []          // raw list
+  selectedTypes.value.clear()       // remove active filters
+  selectedImages.value = []
+  result.value        = {}
+  loading.value       = false
 
+  // empty the reactive loading map
+  for (const key in loadingMap) delete loadingMap[key]
+}
 
 function toggleImage(img) {
   if (selectedImages.value.includes(img)) {
@@ -209,12 +247,19 @@ function toggleImage(img) {
 
 async function scrape() {
   loading.value = true
+  scrapedSite.value = ''               // reset
   result.value = {}
   selectedImages.value = []
-  allImages.value = []               // reset
+  allImages.value = []
+
   try {
     const res = await $fetch('/api/scrape', { method: 'POST', body: { url: url.value } })
     allImages.value = res.slice(0, 20)
+
+    /* store neat hostname like “apple.com” */
+    if (allImages.value.length) {
+      scrapedSite.value = new URL(url.value).hostname   //
+    }
   } catch (err) {
     alert('Failed to scrape site')
     console.error(err)
@@ -222,6 +267,7 @@ async function scrape() {
     loading.value = false
   }
 }
+
 
 async function removeBg(imgUrl) {
   if (isSvg(imgUrl)) {
@@ -326,6 +372,28 @@ function deselectAll() {
 .fadecheck-enter-to, .fadecheck-leave-from {
   opacity: 1;
   transform: scale(1);
+}
+
+
+
+.scroll-window::-webkit-scrollbar {
+  width: 8px;              /* thin bar */
+  height: 8px;             /* in case of horizontal scrolling */
+}
+
+.scroll-window::-webkit-scrollbar-track {
+  background: transparent; /* no background */
+}
+
+.scroll-window::-webkit-scrollbar-thumb {
+  background: #eb4288;  /* Tailwind’s accent colour */
+  border-radius: 4px;
+}
+
+/* ─── Firefox ─── */
+.scroll-window {
+  scrollbar-width: thin;                                      /* thin bar */
+  scrollbar-color: #eb4288 transparent; /* thumb | track */
 }
 
 </style>
